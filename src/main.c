@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
-#define row 30
-#define col 30
+#define cellsX 10
+#define cellsY 10
+#define pixelsPerCell 100
+
+#define WIDTH (cellsX * pixelsPerCell)
+#define HEIGHT (cellsY * pixelsPerCell)
 
 typedef struct {
     float x, y; 
@@ -13,12 +18,27 @@ float dot(Vec2 a, Vec2 b) {
     return a.x * b.x + a.y * b.y;
 }
 
-float linterp (float a, float b, float d) {
+float linterp(float a, float b, float d) {
     return a + d * (b - a);
+}
+
+float fade (float t){
+    return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
 
 int main() {
+    srand(time(NULL));
+
+    // shared angles (theta) all 4 corners must match for all in the whole grid
+    Vec2 theta[cellsY+1][cellsX+1];
+    for(int i = 0; i <= cellsY; i++) {
+        for(int j = 0; j <= cellsX; j++) {
+            float angle = ((float)rand() / RAND_MAX) * 2.0f * 3.14159265358979f;
+            theta[i][j].x = cos(angle);
+            theta[i][j].y = sin(angle);
+        }
+    }
 
     // define the corners vectors theta
     Vec2 BL = {-1,0};
@@ -26,35 +46,58 @@ int main() {
     Vec2 TL = {1,0};
     Vec2 TR = {0,1};
 
-    int boxSize = 30;
-    static int perlin[row][col];
+    static int perlin[HEIGHT][WIDTH];
 
-    for(int i = 0; i < boxSize; i++){
-        for(int j = 0; j < boxSize; j++){
 
-            // convert the pos on 0-9 to 0-1
-            float x = (float)j / (boxSize - 1);
-            float y = (float)i / (boxSize - 1);
+    for(int gridPosY = 0; gridPosY < cellsY; gridPosY++) {
+        for(int gridPosX = 0; gridPosX < cellsX; gridPosX++) {
 
-            Vec2 distBL = {x - 0, y - 0};
-            Vec2 distBR = {x - 1, y - 0};
-            Vec2 distTL = {x - 0, y - 1};
-            Vec2 distTR = {x - 1, y - 1};
+    
+            // loop for the pixels in the grid pos
+            for(int i = 0; i < pixelsPerCell; i++){
+                for(int j = 0; j < pixelsPerCell; j++){
 
-            float dbBL = dot(BL, distBL);
-            float dbBR = dot(BR, distBR);
-            float dbTL = dot(TL, distTL);
-            float dbTR = dot(TR, distTR);
+                    // convert the pos on 0-9 to 0-1
+                    float x = (float)j / (pixelsPerCell - 1);
+                    float y = (float)i / (pixelsPerCell - 1);
 
-            float ixB = linterp(dbBL, dbBR, x);
-            float ixT = linterp(dbTL, dbTR, x);
-            float value = linterp(ixB, ixT, y);
+                    // find distance from point to corner
+                    Vec2 distBL = {x - 0, y - 0};
+                    Vec2 distBR = {x - 1, y - 0};
+                    Vec2 distTL = {x - 0, y - 1};
+                    Vec2 distTR = {x - 1, y - 1};
 
-            int display = (int)((value + 1)* 127.5f);
-            if(display < 0) display = 0;
-            if(display > 255) display = 255;
+                    // theta for the corners of this cell
+                    Vec2 gBL = theta[gridPosY][gridPosX];
+                    Vec2 gBR = theta[gridPosY][gridPosX + 1];
+                    Vec2 gTL = theta[gridPosY + 1][gridPosX];
+                    Vec2 gTR = theta[gridPosY + 1][gridPosX + 1];
 
-            perlin[i][j] = display;
+                    // dot product calc
+                    float dbBL = dot(gBL, distBL);
+                    float dbBR = dot(gBR, distBR);
+                    float dbTL = dot(gTL, distTL);
+                    float dbTR = dot(gTR, distTR);
+
+                    float smoothX = fade(x);
+                    float smoothY = fade(y);
+
+                    // linear interpolation calc
+                    float ixB = linterp(dbBL, dbBR, smoothX);
+                    float ixT = linterp(dbTL, dbTR, smoothX);
+                    float value = linterp(ixB, ixT, smoothY);
+
+                    // to display
+                    int display = (int)((value + 1)* 127.5f);
+                    if(display < 0) display = 0;
+                    if(display > 255) display = 255;
+
+                    int px = gridPosX * pixelsPerCell + j;
+                    int py = gridPosY * pixelsPerCell + i;
+
+                    perlin[py][px] = display;
+                }
+            }
         }
     }
 
@@ -64,15 +107,15 @@ int main() {
         return 1;
     }
 
-    fprintf(f, "P3\n%d %d\n255\n", col, row);
+    fprintf(f, "P3\n%d %d\n255\n", WIDTH, HEIGHT);
 
-    for(int i = 0; i<row; i++) {
-        for(int j = 0; j<col; j++) {
+    for(int i = 0; i<HEIGHT; i++) {
+        for(int j = 0; j<WIDTH; j++) {
             float t = perlin[i][j] / 255.0f;  // t is now 0.0 .. 1.0
 
-            int r = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 0.0f)));  // red
-            int g = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 2.0f)));  // green
-            int b = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 4.0f)));  // blue
+            int r = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 1.0f)));  // red = 0   |
+            int g = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 3.0f)));  // green = 2 | 15 = light blue or white
+            int b = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 6.0f)));  // blue = 4  | yellow = 9
 
             fprintf(f, "%d %d %d ", r, g, b);
         }

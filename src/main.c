@@ -14,14 +14,17 @@ typedef struct {
     float x, y; 
 } Vec2;
 
+// dot product
 float dot(Vec2 a, Vec2 b) {
     return a.x * b.x + a.y * b.y;
 }
 
+// linear interpolation
 float linterp(float a, float b, float d) {
     return a + d * (b - a);
 }
 
+// smoothing for edges of the cells
 float fade (float t){
     return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -58,8 +61,8 @@ int main() {
                 for(int j = 0; j < pixelsPerCell; j++){
 
                     // convert the pos on 0-9 to 0-1
-                    float x = (float)j / (pixelsPerCell - 1);
-                    float y = (float)i / (pixelsPerCell - 1);
+                    float x = (float)j / (pixelsPerCell);
+                    float y = (float)i / (pixelsPerCell);
 
                     // find distance from point to corner
                     Vec2 distBL = {x - 0, y - 0};
@@ -89,6 +92,7 @@ int main() {
 
                     // to display
                     int display = (int)((value + 1)* 127.5f);
+                    display = (display - 128) * 2 + 128;
                     if(display < 0) display = 0;
                     if(display > 255) display = 255;
 
@@ -101,6 +105,7 @@ int main() {
         }
     }
 
+    // write to file
     FILE *f = fopen("Perlin.ppm", "w");
     if (!f) {
         perror("failed to write file");
@@ -113,9 +118,9 @@ int main() {
         for(int j = 0; j<WIDTH; j++) {
             float t = perlin[i][j] / 255.0f;  // t is now 0.0 .. 1.0
 
-            int r = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 1.0f)));  // red = 0   |
-            int g = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 3.0f)));  // green = 2 | 15 = light blue or white
-            int b = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 6.0f)));  // blue = 4  | yellow = 9
+            int r = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 0.0f)));  // red
+            int g = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 2.0f)));  // green
+            int b = (int)(255 * (0.5f + 0.5f * sin(6.28f * t + 4.0f)));  // blue
 
             fprintf(f, "%d %d %d ", r, g, b);
         }
@@ -126,6 +131,7 @@ int main() {
 
     printf("file wrote to Perlin.ppm\n");
 
+    // auto open the file on linux
     system("xdg-open Perlin.ppm");
     
 
